@@ -1,11 +1,23 @@
 "use client";
 
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import type { InvoiceData } from "./invoice-types";
+import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
+import type { InvoiceData, InvoiceTemplate } from "./invoice-types";
 import { calculateTotals, formatCurrency } from "./invoice-types";
 
 // react-pdf components must run client-side for pdf().toBlob() to work in
 // the browser download flow used by invoice-generator-client.tsx.
+
+const TEMPLATE_ACCENT: Record<InvoiceTemplate, string> = {
+  classic: "#14171f",
+  modern: "#4f46e5",
+  minimal: "#14171f",
+};
+
+const TEMPLATE_RULE_WIDTH: Record<InvoiceTemplate, number> = {
+  classic: 1,
+  modern: 2,
+  minimal: 0.5,
+};
 
 const styles = StyleSheet.create({
   page: {
@@ -21,6 +33,12 @@ const styles = StyleSheet.create({
   },
   businessBlock: {
     maxWidth: 260,
+  },
+  logo: {
+    width: 120,
+    maxHeight: 48,
+    objectFit: "contain",
+    marginBottom: 8,
   },
   businessName: {
     fontSize: 14,
@@ -65,13 +83,6 @@ const styles = StyleSheet.create({
   table: {
     marginBottom: 16,
   },
-  tableHeaderRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#14171f",
-    paddingBottom: 6,
-    marginBottom: 6,
-  },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -102,8 +113,6 @@ const styles = StyleSheet.create({
   grandTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: "#14171f",
     marginTop: 4,
     paddingTop: 6,
   },
@@ -124,14 +133,20 @@ const styles = StyleSheet.create({
 });
 
 export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
-  const { subtotal, tax, total } = calculateTotals(data);
+  const { subtotal, discount, tax, total } = calculateTotals(data);
+  const accent = TEMPLATE_ACCENT[data.template] ?? TEMPLATE_ACCENT.classic;
+  const ruleWidth = TEMPLATE_RULE_WIDTH[data.template] ?? 1;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.headerRow}>
           <View style={styles.businessBlock}>
-            <Text style={styles.businessName}>
+            {!!data.businessLogo && (
+              // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop
+              <Image style={styles.logo} src={data.businessLogo} />
+            )}
+            <Text style={[styles.businessName, { color: accent }]}>
               {data.businessName || "Your Business Name"}
             </Text>
             {!!data.businessAddress && (
@@ -142,7 +157,7 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
             )}
           </View>
           <View style={styles.invoiceTitleBlock}>
-            <Text style={styles.invoiceTitle}>INVOICE</Text>
+            <Text style={[styles.invoiceTitle, { color: accent }]}>INVOICE</Text>
             <View style={styles.metaRow}>
               <Text style={styles.muted}>Invoice #</Text>
               <Text>{data.invoiceNumber || "—"}</Text>
@@ -172,7 +187,12 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
         </View>
 
         <View style={styles.table}>
-          <View style={styles.tableHeaderRow}>
+          <View
+            style={[
+              styles.tableRow,
+              { borderBottomWidth: ruleWidth, borderBottomColor: accent, paddingVertical: 0, marginBottom: 6, paddingBottom: 6 },
+            ]}
+          >
             <Text style={[styles.colDescription, styles.headerCell]}>
               Description
             </Text>
@@ -203,13 +223,22 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
             <Text style={styles.muted}>Subtotal</Text>
             <Text>{formatCurrency(subtotal, data.currency)}</Text>
           </View>
+          {discount > 0 && (
+            <View style={styles.totalsRow}>
+              <Text style={styles.muted}>
+                Discount
+                {data.discountType === "percent" ? ` (${data.discountValue || 0}%)` : ""}
+              </Text>
+              <Text>-{formatCurrency(discount, data.currency)}</Text>
+            </View>
+          )}
           <View style={styles.totalsRow}>
             <Text style={styles.muted}>Tax ({data.taxRate || 0}%)</Text>
             <Text>{formatCurrency(tax, data.currency)}</Text>
           </View>
-          <View style={styles.grandTotalRow}>
+          <View style={[styles.grandTotalRow, { borderTopWidth: ruleWidth, borderTopColor: accent }]}>
             <Text style={styles.grandTotalLabel}>Total</Text>
-            <Text style={styles.grandTotalValue}>
+            <Text style={[styles.grandTotalValue, { color: accent }]}>
               {formatCurrency(total, data.currency)}
             </Text>
           </View>

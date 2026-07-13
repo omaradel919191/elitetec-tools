@@ -1,35 +1,68 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   calculateTotals,
   defaultInvoice,
+  defaultDraft,
   formatCurrency,
+  incrementInvoiceNumber,
   newInvoiceItem,
+  splitBusinessProfile,
+  splitDraft,
   type InvoiceData,
+  type InvoiceTemplate,
 } from "@/lib/invoice-types";
 
+const BUSINESS_KEY = "invoice-generator:business-profile";
 const DRAFT_KEY = "invoice-generator:draft";
+const MAX_LOGO_BYTES = 1.5 * 1024 * 1024;
 const CURRENCIES = ["USD", "EUR", "GBP", "AED", "CAD", "AUD"];
+const TEMPLATES: InvoiceTemplate[] = ["classic", "modern", "minimal"];
+
+const TEMPLATE_STYLES: Record<
+  InvoiceTemplate,
+  { title: string; rule: string; totalBorder: string; totalText: string }
+> = {
+  classic: {
+    title: "text-ink",
+    rule: "border-ink/20",
+    totalBorder: "border-ink/20",
+    totalText: "text-ink",
+  },
+  modern: {
+    title: "text-accent",
+    rule: "border-accent",
+    totalBorder: "border-accent",
+    totalText: "text-accent",
+  },
+  minimal: {
+    title: "text-ink",
+    rule: "border-border",
+    totalBorder: "border-border",
+    totalText: "text-ink",
+  },
+};
 
 export function InvoiceGeneratorClient() {
   const t = useTranslations("invoice");
   const [data, setData] = useState<InvoiceData>(() => defaultInvoice());
   const [hydrated, setHydrated] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Load a previously saved draft on mount, merging it over the defaults so
-  // new fields added later always have a sane fallback.
+  // Load the saved business profile + current draft on mount, merging over
+  // the defaults so new fields added later always have a sane fallback.
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as Partial<InvoiceData>;
-        // One-time localStorage hydration on mount (localStorage is unavailable during SSR).
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setData((current) => ({ ...current, ...saved }));
-      }
+      const rawProfile = window.localStorage.getItem(BUSINESS_KEY);
+      const rawDraft = window.localStorage.getItem(DRAFT_KEY);
+      const profile = rawProfile ? JSON.parse(rawProfile) : {};
+      const draft = rawDraft ? JSON.parse(rawDraft) : {};
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setData((current) => ({ ...current, ...profile, ...draft }));
     } catch {
       // Ignore corrupt/unavailable localStorage — fall back to defaults.
     } finally {
@@ -37,17 +70,20 @@ export function InvoiceGeneratorClient() {
     }
   }, []);
 
-  // Persist every change to localStorage so the draft survives a reload.
+  // Persist every change — business fields and the current draft are saved
+  // under separate keys so "New Invoice" can reset one without the other.
   useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+      window.localStorage.setItem(BUSINESS_KEY, JSON.stringify(splitBusinessProfile(data)));
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(splitDraft(data)));
     } catch {
       // Storage may be unavailable (private browsing, quota) — safe to skip.
     }
   }, [data, hydrated]);
 
-  const { subtotal, tax, total } = calculateTotals(data);
+  const { subtotal, discount, tax, total } = calculateTotals(data);
+  const theme = TEMPLATE_STYLES[data.template] ?? TEMPLATE_STYLES.classic;
 
   function updateField<K extends keyof InvoiceData>(key: K, value: InvoiceData[K]) {
     setData((current) => ({ ...current, [key]: value }));
@@ -73,6 +109,38 @@ export function InvoiceGeneratorClient() {
     }));
   }
 
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError(t("logoTooLarge"));
+      return;
+    }
+    setLogoError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        updateField("businessLogo", reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleNewInvoice() {
+    if (!window.confirm(t("newInvoiceConfirm"))) return;
+    setData((current) => {
+      const freshDraft = defaultDraft();
+      const invoiceNumber = current.nextInvoiceNumber || freshDraft.invoiceNumber;
+      return {
+        ...current,
+        ...freshDraft,
+        invoiceNumber,
+        nextInvoiceNumber: incrementInvoiceNumber(invoiceNumber),
+      };
+    });
+  }
+
   async function handleDownloadPdf() {
     setDownloading(true);
     try {
@@ -96,11 +164,20 @@ export function InvoiceGeneratorClient() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
-      <div className="max-w-2xl">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink">
-          {t("pageHeading")}
-        </h1>
-        <p className="mt-2 text-muted">{t("pageIntro")}</p>
+      <div className="flex max-w-2xl flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-ink">
+            {t("pageHeading")}
+          </h1>
+          <p className="mt-2 text-muted">{t("pageIntro")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleNewInvoice}
+          className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+        >
+          {t("newInvoice")}
+        </button>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-2">
@@ -111,6 +188,43 @@ export function InvoiceGeneratorClient() {
               {t("businessDetails")}
             </h2>
             <div className="mt-4 space-y-3">
+              <Field label={t("logo")}>
+                <div className="flex items-center gap-3">
+                  {data.businessLogo ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- transient client-side data URL, not an optimizable static asset
+                    <img
+                      src={data.businessLogo}
+                      alt=""
+                      className="h-10 w-auto rounded border border-border object-contain"
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+                  >
+                    {t("uploadLogo")}
+                  </button>
+                  {data.businessLogo && (
+                    <button
+                      type="button"
+                      onClick={() => updateField("businessLogo", "")}
+                      className="text-sm font-medium text-muted hover:text-red-600"
+                    >
+                      {t("removeLogo")}
+                    </button>
+                  )}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted">{t("logoHint")}</p>
+                {logoError && <p className="mt-1 text-xs text-red-600">{logoError}</p>}
+              </Field>
               <Field label={t("name")}>
                 <input
                   className="input"
@@ -134,6 +248,28 @@ export function InvoiceGeneratorClient() {
                   onChange={(e) => updateField("businessEmail", e.target.value)}
                 />
               </Field>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+              {t("design")}
+            </h2>
+            <div className="mt-4 flex gap-2">
+              {TEMPLATES.map((template) => (
+                <button
+                  key={template}
+                  type="button"
+                  onClick={() => updateField("template", template)}
+                  className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    data.template === template
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-ink hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  {t(`template${template.charAt(0).toUpperCase()}${template.slice(1)}`)}
+                </button>
+              ))}
             </div>
           </section>
 
@@ -282,16 +418,40 @@ export function InvoiceGeneratorClient() {
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-6">
-            <Field label={t("taxRate")}>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className="input max-w-[10rem]"
-                value={data.taxRate}
-                onChange={(e) => updateField("taxRate", Number(e.target.value) || 0)}
-              />
-            </Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label={t("discount")}>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="input"
+                    value={data.discountValue}
+                    onChange={(e) => updateField("discountValue", Number(e.target.value) || 0)}
+                  />
+                  <select
+                    className="input max-w-[9rem]"
+                    value={data.discountType}
+                    onChange={(e) =>
+                      updateField("discountType", e.target.value as InvoiceData["discountType"])
+                    }
+                  >
+                    <option value="percent">{t("discountPercent")}</option>
+                    <option value="fixed">{t("discountFixed")}</option>
+                  </select>
+                </div>
+              </Field>
+              <Field label={t("taxRate")}>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="input"
+                  value={data.taxRate}
+                  onChange={(e) => updateField("taxRate", Number(e.target.value) || 0)}
+                />
+              </Field>
+            </div>
             <p className="mt-2 text-xs text-muted">{t("taxDisclaimer")}</p>
           </section>
 
@@ -327,6 +487,14 @@ export function InvoiceGeneratorClient() {
           <div className="invoice-preview p-8">
             <div className="flex items-start justify-between gap-6">
               <div>
+                {data.businessLogo && (
+                  // eslint-disable-next-line @next/next/no-img-element -- transient client-side data URL, not an optimizable static asset
+                  <img
+                    src={data.businessLogo}
+                    alt=""
+                    className="mb-2 h-10 w-auto object-contain"
+                  />
+                )}
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                   {t("from")}
                 </p>
@@ -341,7 +509,7 @@ export function InvoiceGeneratorClient() {
                 )}
               </div>
               <div className="text-right">
-                <p className="text-lg font-bold tracking-wide">INVOICE</p>
+                <p className={`text-lg font-bold tracking-wide ${theme.title}`}>INVOICE</p>
                 <p className="mt-1 text-sm text-muted">
                   {t("invoiceNumber")}: {data.invoiceNumber || "—"}
                 </p>
@@ -369,7 +537,7 @@ export function InvoiceGeneratorClient() {
 
             <table className="mt-6 w-full text-sm">
               <thead>
-                <tr className="border-b border-ink/20 text-left text-xs uppercase tracking-wide text-muted">
+                <tr className={`border-b text-left text-xs uppercase tracking-wide text-muted ${theme.rule}`}>
                   <th className="py-2 font-semibold">{t("description")}</th>
                   <th className="py-2 text-right font-semibold">{t("quantity")}</th>
                   <th className="py-2 text-right font-semibold">{t("unitPrice")}</th>
@@ -398,13 +566,22 @@ export function InvoiceGeneratorClient() {
                   <span>{t("subtotal")}</span>
                   <span>{formatCurrency(subtotal, data.currency)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>
+                      {t("discount")}
+                      {data.discountType === "percent" ? ` (${data.discountValue || 0}%)` : ""}
+                    </span>
+                    <span>-{formatCurrency(discount, data.currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-muted">
                   <span>
                     {t("tax")} ({data.taxRate || 0}%)
                   </span>
                   <span>{formatCurrency(tax, data.currency)}</span>
                 </div>
-                <div className="flex justify-between border-t border-ink/20 pt-2 text-base font-bold">
+                <div className={`flex justify-between border-t pt-2 text-base font-bold ${theme.totalBorder} ${theme.totalText}`}>
                   <span>{t("total")}</span>
                   <span>{formatCurrency(total, data.currency)}</span>
                 </div>
