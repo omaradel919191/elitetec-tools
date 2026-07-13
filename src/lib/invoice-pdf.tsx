@@ -7,23 +7,56 @@ import { calculateTotals, formatCurrency } from "./invoice-types";
 // react-pdf components must run client-side for pdf().toBlob() to work in
 // the browser download flow used by invoice-generator-client.tsx.
 
-const TEMPLATE_ACCENT: Record<InvoiceTemplate, string> = {
-  classic: "#14171f",
-  modern: "#4f46e5",
-  minimal: "#14171f",
+// Each template is a genuinely different visual treatment, not just a color
+// swap: different typeface, different header/total structure.
+type TemplateConfig = {
+  headingFont: string;
+  bodyFont: string;
+  accent: string;
+  titleBadge: boolean; // "INVOICE" sits in a solid color block
+  tableHeaderBg: string | null;
+  tableHeaderRule: number; // 0 = no rule, rely on the bg/whitespace instead
+  totalBadge: boolean; // grand total sits in a solid color block
+  totalRule: number;
 };
 
-const TEMPLATE_RULE_WIDTH: Record<InvoiceTemplate, number> = {
-  classic: 1,
-  modern: 2,
-  minimal: 0.5,
+const TEMPLATES: Record<InvoiceTemplate, TemplateConfig> = {
+  classic: {
+    headingFont: "Times-Bold",
+    bodyFont: "Times-Roman",
+    accent: "#14171f",
+    titleBadge: false,
+    tableHeaderBg: null,
+    tableHeaderRule: 1.5,
+    totalBadge: false,
+    totalRule: 1.5,
+  },
+  modern: {
+    headingFont: "Helvetica-Bold",
+    bodyFont: "Helvetica",
+    accent: "#4f46e5",
+    titleBadge: true,
+    tableHeaderBg: "#eef2ff",
+    tableHeaderRule: 0,
+    totalBadge: true,
+    totalRule: 0,
+  },
+  minimal: {
+    headingFont: "Helvetica",
+    bodyFont: "Helvetica",
+    accent: "#14171f",
+    titleBadge: false,
+    tableHeaderBg: null,
+    tableHeaderRule: 0,
+    totalBadge: false,
+    totalRule: 0.75,
+  },
 };
 
 const styles = StyleSheet.create({
   page: {
     padding: 40,
     fontSize: 10,
-    fontFamily: "Helvetica",
     color: "#14171f",
   },
   headerRow: {
@@ -42,7 +75,6 @@ const styles = StyleSheet.create({
   },
   businessName: {
     fontSize: 14,
-    fontFamily: "Helvetica-Bold",
     marginBottom: 4,
   },
   muted: {
@@ -54,7 +86,6 @@ const styles = StyleSheet.create({
   },
   invoiceTitle: {
     fontSize: 20,
-    fontFamily: "Helvetica-Bold",
     marginBottom: 6,
     letterSpacing: 1,
   },
@@ -82,6 +113,10 @@ const styles = StyleSheet.create({
   },
   table: {
     marginBottom: 16,
+  },
+  tableHeaderRow: {
+    flexDirection: "row",
+    paddingHorizontal: 6,
   },
   tableRow: {
     flexDirection: "row",
@@ -134,19 +169,18 @@ const styles = StyleSheet.create({
 
 export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
   const { subtotal, discount, tax, total } = calculateTotals(data);
-  const accent = TEMPLATE_ACCENT[data.template] ?? TEMPLATE_ACCENT.classic;
-  const ruleWidth = TEMPLATE_RULE_WIDTH[data.template] ?? 1;
+  const cfg = TEMPLATES[data.template] ?? TEMPLATES.classic;
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={[styles.page, { fontFamily: cfg.bodyFont }]}>
         <View style={styles.headerRow}>
           <View style={styles.businessBlock}>
             {!!data.businessLogo && (
               // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt prop
               <Image style={styles.logo} src={data.businessLogo} />
             )}
-            <Text style={[styles.businessName, { color: accent }]}>
+            <Text style={[styles.businessName, { fontFamily: cfg.headingFont, color: cfg.accent }]}>
               {data.businessName || "Your Business Name"}
             </Text>
             {!!data.businessAddress && (
@@ -157,7 +191,25 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
             )}
           </View>
           <View style={styles.invoiceTitleBlock}>
-            <Text style={[styles.invoiceTitle, { color: accent }]}>INVOICE</Text>
+            {cfg.titleBadge ? (
+              <View
+                style={{
+                  backgroundColor: cfg.accent,
+                  borderRadius: 3,
+                  paddingVertical: 5,
+                  paddingHorizontal: 12,
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={[styles.invoiceTitle, { fontFamily: cfg.headingFont, color: "#ffffff", marginBottom: 0 }]}>
+                  INVOICE
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.invoiceTitle, { fontFamily: cfg.headingFont, color: cfg.accent }]}>
+                INVOICE
+              </Text>
+            )}
             <View style={styles.metaRow}>
               <Text style={styles.muted}>Invoice #</Text>
               <Text>{data.invoiceNumber || "—"}</Text>
@@ -175,7 +227,7 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
 
         <View style={styles.billTo}>
           <Text style={styles.sectionLabel}>Bill To</Text>
-          <Text style={styles.clientName}>
+          <Text style={[styles.clientName, { fontFamily: cfg.headingFont }]}>
             {data.clientName || "Client Name"}
           </Text>
           {!!data.clientAddress && (
@@ -189,8 +241,16 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
         <View style={styles.table}>
           <View
             style={[
-              styles.tableRow,
-              { borderBottomWidth: ruleWidth, borderBottomColor: accent, paddingVertical: 0, marginBottom: 6, paddingBottom: 6 },
+              styles.tableHeaderRow,
+              {
+                backgroundColor: cfg.tableHeaderBg ?? undefined,
+                borderBottomWidth: cfg.tableHeaderRule,
+                borderBottomColor: cfg.accent,
+                paddingVertical: cfg.tableHeaderBg ? 6 : 0,
+                paddingHorizontal: cfg.tableHeaderBg ? 6 : 0,
+                marginBottom: cfg.tableHeaderBg ? 4 : 6,
+                paddingBottom: cfg.tableHeaderBg ? 6 : 6,
+              },
             ]}
           >
             <Text style={[styles.colDescription, styles.headerCell]}>
@@ -203,7 +263,7 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
             <Text style={[styles.colAmount, styles.headerCell]}>Amount</Text>
           </View>
           {data.items.map((item) => (
-            <View style={styles.tableRow} key={item.id} wrap={false}>
+            <View style={[styles.tableRow, { paddingHorizontal: cfg.tableHeaderBg ? 6 : 0 }]} key={item.id} wrap={false}>
               <Text style={styles.colDescription}>
                 {item.description || "—"}
               </Text>
@@ -236,12 +296,31 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
             <Text style={styles.muted}>Tax ({data.taxRate || 0}%)</Text>
             <Text>{formatCurrency(tax, data.currency)}</Text>
           </View>
-          <View style={[styles.grandTotalRow, { borderTopWidth: ruleWidth, borderTopColor: accent }]}>
-            <Text style={styles.grandTotalLabel}>Total</Text>
-            <Text style={[styles.grandTotalValue, { color: accent }]}>
-              {formatCurrency(total, data.currency)}
-            </Text>
-          </View>
+          {cfg.totalBadge ? (
+            <View
+              style={{
+                backgroundColor: cfg.accent,
+                borderRadius: 3,
+                marginTop: 6,
+                paddingVertical: 6,
+                paddingHorizontal: 8,
+                flexDirection: "row",
+                justifyContent: "space-between",
+              }}
+            >
+              <Text style={{ fontFamily: cfg.headingFont, color: "#ffffff" }}>Total</Text>
+              <Text style={{ fontFamily: cfg.headingFont, color: "#ffffff", fontSize: 12 }}>
+                {formatCurrency(total, data.currency)}
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.grandTotalRow, { borderTopWidth: cfg.totalRule, borderTopColor: cfg.accent }]}>
+              <Text style={[styles.grandTotalLabel, { fontFamily: cfg.headingFont }]}>Total</Text>
+              <Text style={[styles.grandTotalValue, { fontFamily: cfg.headingFont, color: cfg.accent }]}>
+                {formatCurrency(total, data.currency)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {!!data.notes && (

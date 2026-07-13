@@ -21,27 +21,50 @@ const MAX_LOGO_BYTES = 1.5 * 1024 * 1024;
 const CURRENCIES = ["USD", "EUR", "GBP", "AED", "CAD", "AUD"];
 const TEMPLATES: InvoiceTemplate[] = ["classic", "modern", "minimal"];
 
+// Each template is a genuinely different visual treatment, not just a color
+// swap: different typeface, different header/total structure.
 const TEMPLATE_STYLES: Record<
   InvoiceTemplate,
-  { title: string; rule: string; totalBorder: string; totalText: string }
+  {
+    fontClass: string;
+    headingFontClass: string;
+    titleClass: string;
+    titleWrapperClass: string;
+    ruleClass: string;
+    tableHeaderClass: string;
+    totalRowClass: string;
+    totalWrapperClass: string;
+  }
 > = {
   classic: {
-    title: "text-ink",
-    rule: "border-ink/20",
-    totalBorder: "border-ink/20",
-    totalText: "text-ink",
+    fontClass: "font-serif",
+    headingFontClass: "font-serif",
+    titleClass: "text-ink",
+    titleWrapperClass: "",
+    ruleClass: "border-b-2 border-ink/70",
+    tableHeaderClass: "text-muted",
+    totalRowClass: "border-t-2 border-ink/70 text-ink",
+    totalWrapperClass: "",
   },
   modern: {
-    title: "text-accent",
-    rule: "border-accent",
-    totalBorder: "border-accent",
-    totalText: "text-accent",
+    fontClass: "font-sans",
+    headingFontClass: "font-sans",
+    titleClass: "text-white",
+    titleWrapperClass: "inline-block rounded-md bg-accent px-3 py-1",
+    ruleClass: "",
+    tableHeaderClass: "bg-accent/10 text-accent",
+    totalRowClass: "rounded-md bg-accent text-white",
+    totalWrapperClass: "px-3 py-2",
   },
   minimal: {
-    title: "text-ink",
-    rule: "border-border",
-    totalBorder: "border-border",
-    totalText: "text-ink",
+    fontClass: "font-sans font-normal",
+    headingFontClass: "font-sans font-medium",
+    titleClass: "text-ink font-normal",
+    titleWrapperClass: "",
+    ruleClass: "",
+    tableHeaderClass: "text-muted",
+    totalRowClass: "border-t border-border pt-3 text-ink",
+    totalWrapperClass: "",
   },
 };
 
@@ -484,7 +507,7 @@ export function InvoiceGeneratorClient() {
             </button>
           </div>
 
-          <div className="invoice-preview p-8">
+          <div className={`invoice-preview p-8 ${theme.fontClass}`}>
             <div className="flex items-start justify-between gap-6">
               <div>
                 {data.businessLogo && (
@@ -498,7 +521,9 @@ export function InvoiceGeneratorClient() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                   {t("from")}
                 </p>
-                <p className="mt-1 font-semibold">{data.businessName || "—"}</p>
+                <p className={`mt-1 ${theme.headingFontClass} font-semibold`}>
+                  {data.businessName || "—"}
+                </p>
                 {data.businessAddress && (
                   <p className="whitespace-pre-line text-sm text-muted">
                     {data.businessAddress}
@@ -509,7 +534,9 @@ export function InvoiceGeneratorClient() {
                 )}
               </div>
               <div className="text-right">
-                <p className={`text-lg font-bold tracking-wide ${theme.title}`}>INVOICE</p>
+                <div className={theme.titleWrapperClass}>
+                  <p className={`text-lg font-bold tracking-wide ${theme.titleClass}`}>INVOICE</p>
+                </div>
                 <p className="mt-1 text-sm text-muted">
                   {t("invoiceNumber")}: {data.invoiceNumber || "—"}
                 </p>
@@ -537,11 +564,11 @@ export function InvoiceGeneratorClient() {
 
             <table className="mt-6 w-full text-sm">
               <thead>
-                <tr className={`border-b text-left text-xs uppercase tracking-wide text-muted ${theme.rule}`}>
-                  <th className="py-2 font-semibold">{t("description")}</th>
-                  <th className="py-2 text-right font-semibold">{t("quantity")}</th>
-                  <th className="py-2 text-right font-semibold">{t("unitPrice")}</th>
-                  <th className="py-2 text-right font-semibold">{t("amount")}</th>
+                <tr className={`text-left text-xs uppercase tracking-wide ${theme.ruleClass} ${theme.tableHeaderClass}`}>
+                  <th className="px-2 py-2 font-semibold first:pl-0">{t("description")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("quantity")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("unitPrice")}</th>
+                  <th className="px-2 py-2 text-right font-semibold last:pr-0">{t("amount")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -581,7 +608,9 @@ export function InvoiceGeneratorClient() {
                   </span>
                   <span>{formatCurrency(tax, data.currency)}</span>
                 </div>
-                <div className={`flex justify-between border-t pt-2 text-base font-bold ${theme.totalBorder} ${theme.totalText}`}>
+                <div
+                  className={`flex justify-between text-base font-bold ${theme.totalRowClass} ${theme.totalWrapperClass || "pt-2"}`}
+                >
                   <span>{t("total")}</span>
                   <span>{formatCurrency(total, data.currency)}</span>
                 </div>
