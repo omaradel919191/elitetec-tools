@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "brand": "EliteTec Tools",
+    "title": "EliteTec Tools — Free Browser-Based Business Tools",
+    "description": "Free, no-login business tools that run entirely in your browser. Start with our Invoice Generator — create and download a professional PDF invoice in minutes."
+  },
+  "nav": {
+    "home": "Home",
+    "invoiceGenerator": "Invoice Generator",
+    "about": "About",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use"
+  },
+  "home": {
+    "heroHeading": "Free business tools that work right in your browser",
+    "heroSubheading": "No sign-up, no installs, nothing uploaded to a server. Pick a tool below and get to work.",
+    "toolCtaLabel": "Open tool"
+  },
+  "tools": {
+    "invoiceGenerator": {
+      "title": "Invoice Generator",
+      "description": "Create a clean, professional invoice and download it as a PDF in minutes — completely free, no account required."
+    }
+  },
+  "invoice": {
+    "pageHeading": "Invoice Generator",
+    "pageIntro": "Fill in your details on the left and watch the preview update instantly. When you're ready, download a print-ready PDF.",
+    "businessDetails": "Your Business Details",
+    "clientDetails": "Client Details",
+    "name": "Name",
+    "address": "Address",
+    "email": "Email",
+    "invoiceNumber": "Invoice Number",
+    "issueDate": "Issue Date",
+    "dueDate": "Due Date",
+    "currency": "Currency",
+    "items": "Items",
+    "description": "Description",
+    "quantity": "Qty",
+    "unitPrice": "Unit Price",
+    "amount": "Amount",
+    "addItem": "Add Item",
+    "removeItem": "Remove",
+    "taxRate": "Tax Rate (%)",
+    "taxDisclaimer": "This tool does not provide tax or legal advice — confirm applicable rates with a local accountant.",
+    "notes": "Notes",
+    "notesPlaceholder": "Payment terms, bank details, thank-you note, or anything else your client should know.",
+    "subtotal": "Subtotal",
+    "tax": "Tax",
+    "total": "Total",
+    "downloadPdf": "Download PDF",
+    "generatingPdf": "Generating…",
+    "livePreview": "Live Preview",
+    "billTo": "Bill To",
+    "from": "From"
+  },
+  "footer": {
+    "copyright": "© {year} EliteTec Tools. All rights reserved.",
+    "browserOnlyNote": "Tools run entirely in your browser — nothing you type is uploaded.",
+    "aboutLabel": "About",
+    "contactLabel": "Contact",
+    "privacyLabel": "Privacy Policy",
+    "termsLabel": "Terms of Use"
+  }
+}
