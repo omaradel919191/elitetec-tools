@@ -31,11 +31,24 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-n8n_default}"
-      - "traefik.http.routers.elitetectools.rule=Host(`${DOMAIN:-tools.eliteteconline.com}`)"
+      # Canonical host — eliteteconline.com serves the app (also required so
+      # AdSense's ads.txt lives at the root domain, not a subdomain).
+      - "traefik.http.routers.elitetectools.rule=Host(`${DOMAIN:-eliteteconline.com}`)"
       - "traefik.http.routers.elitetectools.entrypoints=websecure"
       - "traefik.http.routers.elitetectools.tls=true"
       - "traefik.http.routers.elitetectools.tls.certresolver=${CERT_RESOLVER:-mytlschallenge}"
       - "traefik.http.services.elitetectools.loadbalancer.server.port=3000"
+      # www. and the old tools. subdomain permanently redirect to the
+      # canonical root host (avoids duplicate content across hostnames).
+      - 'traefik.http.middlewares.elitetectools-redirect.redirectregex.regex=^https://(?:www\.eliteteconline\.com|tools\.eliteteconline\.com)(.*)'
+      - 'traefik.http.middlewares.elitetectools-redirect.redirectregex.replacement=https://eliteteconline.com$${1}'
+      - "traefik.http.middlewares.elitetectools-redirect.redirectregex.permanent=true"
+      - "traefik.http.routers.elitetectools-redirect.rule=Host(`www.eliteteconline.com`) || Host(`tools.eliteteconline.com`)"
+      - "traefik.http.routers.elitetectools-redirect.entrypoints=websecure"
+      - "traefik.http.routers.elitetectools-redirect.tls=true"
+      - "traefik.http.routers.elitetectools-redirect.tls.certresolver=${CERT_RESOLVER:-mytlschallenge}"
+      - "traefik.http.routers.elitetectools-redirect.middlewares=elitetectools-redirect"
+      - "traefik.http.routers.elitetectools-redirect.service=elitetectools"
 
 networks:
   default:
