@@ -52,6 +52,7 @@ export async function generateMetadata({
     },
     robots: { index: true, follow: true },
     icons: { icon: "/favicon.ico" },
+    verification: { google: "frPgfnrh6ihlKc1FW95_c6ojtL-8Kzl0LwbKwtVo358" },
   };
 }
 
