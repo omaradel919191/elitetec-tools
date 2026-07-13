@@ -15,12 +15,11 @@ export default function ContactPage() {
           from you.
         </p>
         <p>
-          {/* TODO: replace with real contact email before deploy */}
           <a
-            href="mailto:hello@eliteteconline.com"
+            href="mailto:info@eliteteconline.com"
             className="font-medium text-accent hover:text-accent-hover"
           >
-            hello@eliteteconline.com
+            info@eliteteconline.com
           </a>
         </p>
         <p>We try to reply to every message, though it may take a few days.</p>
