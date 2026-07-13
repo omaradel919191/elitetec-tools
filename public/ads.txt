@@ -1,1 +1,1 @@
-# AdSense publisher entry goes here once the site is approved (see Google AdSense > Sites > tools.eliteteconline.com).
+google.com, pub-5489422871963359, DIRECT, f08c47fec0942fa0

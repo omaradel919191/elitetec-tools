@@ -84,6 +84,13 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5489422871963359"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="flex min-h-dvh flex-col bg-bg text-ink antialiased">
         <script
           type="application/ld+json"
