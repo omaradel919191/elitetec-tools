@@ -57,12 +57,34 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-ink">Server logs and analytics</h2>
+          <h2 className="text-lg font-semibold text-ink">Analytics</h2>
+          <p className="mt-2">
+            We use Google Analytics to understand aggregate traffic to this site — for
+            example, how many people visit, which pages they view, and which sites or
+            searches referred them. Google Analytics uses cookies and collects data
+            such as your approximate location, device/browser type, and the pages you
+            visit. This is separate from — and has no access to — the data you enter
+            into our tools, which never leaves your browser. You can learn more, or opt
+            out of Google Analytics tracking across sites, through{" "}
+            <a
+              href="https://policies.google.com/privacy"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-accent hover:text-accent-hover"
+            >
+              Google&apos;s own Privacy Policy
+            </a>
+            .
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-ink">Server logs</h2>
           <p className="mt-2">
             Like most websites, our hosting infrastructure may automatically collect
             basic web server logs (such as IP address, browser/user agent, and pages
-            requested) for security and aggregate analytics purposes. This is standard
-            operational logging, not information tied to what you type into a tool.
+            requested) for security purposes. This is standard operational logging, not
+            information tied to what you type into a tool.
           </p>
         </section>
 
