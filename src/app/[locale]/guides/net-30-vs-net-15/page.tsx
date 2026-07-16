@@ -1,15 +1,80 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { JsonLd } from "@/components/json-ld";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Net 15 vs Net 30 vs Net 60: Which Payment Term Should You Use?",
   description:
-    "A plain-English explanation of Net 15, Net 30, and Net 60 payment terms, and when freelancers and small businesses typically use each.",
+    "A plain-English explanation of Net 15, Net 30, and Net 60 payment terms, when freelancers and small businesses use each, and answers to common questions.",
 };
+
+const URL = `${SITE.url}/en/guides/net-30-vs-net-15`;
+
+const faqs = [
+  {
+    q: "What does Net 30 mean on an invoice?",
+    a: "Net 30 means the full invoice amount is due 30 days after the invoice date, with no early-payment discount. Net 15 and Net 60 work the same way with 15 or 60 days instead.",
+  },
+  {
+    q: "Is Net 30 counted from the invoice date or the delivery date?",
+    a: "By default it is counted from the invoice (issue) date. If you want it measured from delivery or from receipt, say so explicitly on the invoice, because otherwise the client will assume the invoice date.",
+  },
+  {
+    q: "What does 2/10 Net 30 mean?",
+    a: "It means the full amount is due in 30 days, but the client can take a 2% discount if they pay within 10 days. It is a way to encourage faster payment in exchange for a small price reduction.",
+  },
+  {
+    q: "Which payment term is best for freelancers?",
+    a: "Net 15 or due-on-receipt is often better for freelancers and small jobs because it keeps cash flow tight. Net 30 is a safe default for business-to-business work, and Net 60 is usually only worth accepting for large clients if you price the delay into your rates.",
+  },
+  {
+    q: "Can I charge a late fee if a client misses the term?",
+    a: "Yes, if you stated the late-fee policy in advance on the invoice or in your contract. Make the terms visible before the work starts rather than adding a surprise fee afterward.",
+  },
+];
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline:
+      "Net 15 vs Net 30 vs Net 60: Which Payment Term Should You Use?",
+    description:
+      "A plain-English explanation of Net 15, Net 30, and Net 60 payment terms, and when freelancers and small businesses typically use each.",
+    author: { "@type": "Organization", name: SITE.name },
+    publisher: { "@type": "Organization", name: SITE.name, url: SITE.url },
+    mainEntityOfPage: URL,
+    inLanguage: "en",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${SITE.url}/en` },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Net 15 vs Net 30 vs Net 60",
+        item: URL,
+      },
+    ],
+  },
+];
 
 export default function Net30VsNet15Page() {
   return (
     <article className="mx-auto max-w-3xl px-6 py-16">
+      <JsonLd data={jsonLd} />
       <h1 className="text-3xl font-semibold tracking-tight text-ink">
         Net 15 vs Net 30 vs Net 60: Which Payment Term Should You Use?
       </h1>
@@ -53,6 +118,18 @@ export default function Net30VsNet15Page() {
           rates if a client requires it.
         </p>
 
+        <h2 className="text-xl font-semibold text-ink">
+          Due-on-receipt and early-payment discounts
+        </h2>
+        <p>
+          Two other options are worth knowing. &quot;Due on receipt&quot; asks for
+          payment as soon as the invoice arrives — useful for one-off jobs or clients
+          you haven&apos;t worked with before. Early-payment discounts like 2/10 Net 30
+          keep a standard 30-day term but reward the client for paying early; they can
+          speed up cash flow, but only offer one if the small discount is worth it to
+          you.
+        </p>
+
         <h2 className="text-xl font-semibold text-ink">Which one should you use?</h2>
         <p>
           For most freelancers and small businesses, Net 30 is a reasonable default
@@ -70,8 +147,26 @@ export default function Net30VsNet15Page() {
           Whatever term you choose, state it clearly on every single invoice — not
           just in an email or a contract the client signed months ago. A due date
           printed directly on the invoice is far less likely to be missed than a term
-          buried in earlier correspondence.
+          buried in earlier correspondence. If you&apos;re still deciding what else
+          belongs on the document, see our guide on{" "}
+          <Link
+            href="/en/guides/how-to-write-an-invoice"
+            className="text-accent hover:text-accent-hover"
+          >
+            how to write a professional invoice
+          </Link>
+          .
         </p>
+
+        <h2 className="text-xl font-semibold text-ink">Frequently asked questions</h2>
+        <div className="space-y-5">
+          {faqs.map((f) => (
+            <div key={f.q}>
+              <h3 className="font-semibold text-ink">{f.q}</h3>
+              <p className="mt-1">{f.a}</p>
+            </div>
+          ))}
+        </div>
 
         <p>
           Our{" "}

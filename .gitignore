@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# project knowledge files (Claude context, not part of the app)
+EliteTec_Model.md
+EliteTec_Invoice_Tool.md

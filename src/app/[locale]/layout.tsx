@@ -8,6 +8,7 @@ import Script from "next/script";
 import { routing } from "@/i18n/routing";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { JsonLd } from "@/components/json-ld";
 import { SITE } from "@/lib/site";
 import "../globals.css";
 
@@ -70,19 +71,28 @@ export default async function LocaleLayout({
   }
   setRequestLocale(locale);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "Invoice Generator",
-    applicationCategory: "BusinessApplication",
-    operatingSystem: "Any",
-    url: `${SITE.url}/${locale}/invoice-generator`,
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: SITE.name,
+      url: `${SITE.url}/${locale}`,
+      description: SITE.description,
+      inLanguage: "en",
+      publisher: {
+        "@type": "Organization",
+        name: SITE.name,
+        url: SITE.url,
+      },
     },
-  };
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: SITE.name,
+      url: SITE.url,
+      email: "info@eliteteconline.com",
+    },
+  ];
 
   return (
     <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>
@@ -94,10 +104,7 @@ export default async function LocaleLayout({
         />
       </head>
       <body className="flex min-h-dvh flex-col bg-bg text-ink antialiased">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <JsonLd data={jsonLd} />
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-1BT4LDETR6"
           strategy="afterInteractive"
