@@ -13,6 +13,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/en/terms",
     "/en/guides/how-to-write-an-invoice",
     "/en/guides/net-30-vs-net-15",
+    "/en/guides/invoice-vs-receipt",
+    "/en/guides/how-to-send-an-invoice",
+    "/en/guides/late-paying-clients",
   ];
 
   return paths.map((path) => ({
