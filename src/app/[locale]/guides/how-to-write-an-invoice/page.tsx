@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: "How to Write a Professional Invoice",
   description:
     "A practical guide to what belongs on a professional invoice: business details, client details, itemized charges, tax, payment terms, and notes — plus common mistakes and FAQs.",
+  alternates: {
+    canonical: "/en/guides/how-to-write-an-invoice",
+    languages: { en: "/en/guides/how-to-write-an-invoice", "x-default": "/en/guides/how-to-write-an-invoice" },
+  },
 };
 
 const URL = `${SITE.url}/en/guides/how-to-write-an-invoice`;

@@ -4,6 +4,10 @@ import { Link } from "@/i18n/navigation";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "How EliteTec Tools handles your data.",
+  alternates: {
+    canonical: "/en/privacy-policy",
+    languages: { en: "/en/privacy-policy", "x-default": "/en/privacy-policy" },
+  },
 };
 
 export default function PrivacyPolicyPage() {

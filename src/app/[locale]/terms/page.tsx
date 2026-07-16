@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Terms of Use",
   description: "The terms under which you may use EliteTec Tools.",
+  alternates: {
+    canonical: "/en/terms",
+    languages: { en: "/en/terms", "x-default": "/en/terms" },
+  },
 };
 
 export default function TermsPage() {

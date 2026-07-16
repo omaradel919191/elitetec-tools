@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: "Net 15 vs Net 30 vs Net 60: Which Payment Term Should You Use?",
   description:
     "A plain-English explanation of Net 15, Net 30, and Net 60 payment terms, when freelancers and small businesses use each, and answers to common questions.",
+  alternates: {
+    canonical: "/en/guides/net-30-vs-net-15",
+    languages: { en: "/en/guides/net-30-vs-net-15", "x-default": "/en/guides/net-30-vs-net-15" },
+  },
 };
 
 const URL = `${SITE.url}/en/guides/net-30-vs-net-15`;

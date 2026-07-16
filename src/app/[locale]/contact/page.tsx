@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Contact",
   description: "Get in touch with the EliteTec Tools team.",
+  alternates: {
+    canonical: "/en/contact",
+    languages: { en: "/en/contact", "x-default": "/en/contact" },
+  },
 };
 
 export default function ContactPage() {

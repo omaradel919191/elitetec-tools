@@ -4,6 +4,10 @@ export const metadata: Metadata = {
   title: "About",
   description:
     "EliteTec Tools is a small hub of free, browser-based business utilities, starting with an Invoice Generator.",
+  alternates: {
+    canonical: "/en/about",
+    languages: { en: "/en/about", "x-default": "/en/about" },
+  },
 };
 
 export default function AboutPage() {
