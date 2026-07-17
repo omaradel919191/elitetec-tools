@@ -5,6 +5,12 @@ export type InvoiceItem = {
   unitPrice: number;
 };
 
+export type TaxLine = {
+  id: string;
+  label: string;
+  rate: number; // percent, e.g. 8.5
+};
+
 export type InvoiceTemplate = "classic" | "modern" | "minimal";
 export type DiscountType = "percent" | "fixed";
 
@@ -28,13 +34,28 @@ export type InvoiceDraft = {
   dueDate: string;
   currency: string; // e.g. "USD"
   items: InvoiceItem[];
-  taxRate: number; // percent, e.g. 8.5
+  taxes: TaxLine[]; // one or more named tax lines
   discountType: DiscountType;
   discountValue: number; // percent points, or a fixed amount in `currency`
   notes: string;
 };
 
 export type InvoiceData = BusinessProfile & InvoiceDraft;
+
+// A named snapshot the user can reload later. Stored in localStorage.
+export type SavedInvoice = {
+  id: string;
+  name: string;
+  savedAt: number; // epoch ms
+  data: InvoiceData;
+};
+
+export type TaxBreakdownLine = {
+  id: string;
+  label: string;
+  rate: number;
+  amount: number;
+};
 
 export function calculateTotals(data: InvoiceData) {
   const subtotal = data.items.reduce(
@@ -47,8 +68,17 @@ export function calculateTotals(data: InvoiceData) {
       : data.discountValue;
   const discount = Math.min(Math.max(rawDiscount, 0), subtotal);
   const taxableAmount = subtotal - discount;
-  const tax = taxableAmount * (data.taxRate / 100);
-  return { subtotal, discount, tax, total: taxableAmount + tax };
+
+  const taxes = Array.isArray(data.taxes) ? data.taxes : [];
+  const taxLines: TaxBreakdownLine[] = taxes.map((t) => ({
+    id: t.id,
+    label: t.label,
+    rate: t.rate,
+    amount: taxableAmount * ((t.rate || 0) / 100),
+  }));
+  const tax = taxLines.reduce((sum, l) => sum + l.amount, 0);
+
+  return { subtotal, discount, taxableAmount, taxLines, tax, total: taxableAmount + tax };
 }
 
 export function formatCurrency(amount: number, currency: string) {
@@ -65,7 +95,7 @@ function makeId() {
   }
   // SSR / older-runtime fallback — never actually hit in practice since this
   // is only called from a "use client" component's useState initializer.
-  return `item-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+  return `id-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
 // Bumps the trailing numeric run in an invoice number, preserving any
@@ -79,6 +109,32 @@ export function incrementInvoiceNumber(current: string): string {
   const [, prefix, digits, suffix] = match;
   const next = String(Number(digits) + 1).padStart(digits.length, "0");
   return `${prefix}${next}${suffix}`;
+}
+
+export function newTaxLine(label = "Tax", rate = 0): TaxLine {
+  return { id: makeId(), label, rate };
+}
+
+// Guarantees `.taxes` is a valid array, migrating the legacy single
+// `taxRate` field (older saved drafts) into a one-line taxes array.
+export function ensureTaxes<T extends Record<string, unknown>>(obj: T): T {
+  const anyObj = obj as Record<string, unknown>;
+  if (!Array.isArray(anyObj.taxes)) {
+    const legacy = anyObj.taxRate;
+    anyObj.taxes =
+      typeof legacy === "number"
+        ? [newTaxLine("Tax", legacy)]
+        : [newTaxLine()];
+  } else {
+    // ensure each line has an id (defensive against hand-edited storage)
+    anyObj.taxes = (anyObj.taxes as TaxLine[]).map((t) => ({
+      id: t.id || makeId(),
+      label: typeof t.label === "string" ? t.label : "Tax",
+      rate: typeof t.rate === "number" ? t.rate : 0,
+    }));
+  }
+  delete anyObj.taxRate;
+  return obj;
 }
 
 export function defaultBusinessProfile(): BusinessProfile {
@@ -106,7 +162,7 @@ export function defaultDraft(): InvoiceDraft {
     dueDate: iso(due),
     currency: "USD",
     items: [{ id: makeId(), description: "", quantity: 1, unitPrice: 0 }],
-    taxRate: 0,
+    taxes: [newTaxLine()],
     discountType: "percent",
     discountValue: 0,
     notes: "",
@@ -139,7 +195,7 @@ export const DRAFT_KEYS: (keyof InvoiceDraft)[] = [
   "dueDate",
   "currency",
   "items",
-  "taxRate",
+  "taxes",
   "discountType",
   "discountValue",
   "notes",

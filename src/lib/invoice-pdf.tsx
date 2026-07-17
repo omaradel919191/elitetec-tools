@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
 });
 
 export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
-  const { subtotal, discount, tax, total } = calculateTotals(data);
+  const { subtotal, discount, taxLines, total } = calculateTotals(data);
   const cfg = TEMPLATES[data.template] ?? TEMPLATES.classic;
 
   return (
@@ -292,10 +292,14 @@ export function InvoicePdfDocument({ data }: { data: InvoiceData }) {
               <Text>-{formatCurrency(discount, data.currency)}</Text>
             </View>
           )}
-          <View style={styles.totalsRow}>
-            <Text style={styles.muted}>Tax ({data.taxRate || 0}%)</Text>
-            <Text>{formatCurrency(tax, data.currency)}</Text>
-          </View>
+          {taxLines.map((line) => (
+            <View style={styles.totalsRow} key={line.id}>
+              <Text style={styles.muted}>
+                {(line.label || "Tax")} ({line.rate || 0}%)
+              </Text>
+              <Text>{formatCurrency(line.amount, data.currency)}</Text>
+            </View>
+          ))}
           {cfg.totalBadge ? (
             <View
               style={{

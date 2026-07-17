@@ -6,20 +6,26 @@ import {
   calculateTotals,
   defaultInvoice,
   defaultDraft,
+  ensureTaxes,
   formatCurrency,
   incrementInvoiceNumber,
   newInvoiceItem,
+  newTaxLine,
   splitBusinessProfile,
   splitDraft,
   type InvoiceData,
   type InvoiceTemplate,
+  type SavedInvoice,
 } from "@/lib/invoice-types";
 
 const BUSINESS_KEY = "invoice-generator:business-profile";
 const DRAFT_KEY = "invoice-generator:draft";
+const SAVED_KEY = "invoice-generator:saved";
 const MAX_LOGO_BYTES = 1.5 * 1024 * 1024;
 const CURRENCIES = ["USD", "EUR", "GBP", "AED", "CAD", "AUD"];
 const TEMPLATES: InvoiceTemplate[] = ["classic", "modern", "minimal"];
+
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
 // Each template is a genuinely different visual treatment, not just a color
 // swap: different typeface, different header/total structure.
@@ -71,21 +77,28 @@ const TEMPLATE_STYLES: Record<
 export function InvoiceGeneratorClient() {
   const t = useTranslations("invoice");
   const [data, setData] = useState<InvoiceData>(() => defaultInvoice());
+  const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Load the saved business profile + current draft on mount, merging over
-  // the defaults so new fields added later always have a sane fallback.
+  // Load the saved business profile + current draft + saved list on mount,
+  // merging over the defaults so new fields always have a sane fallback.
   useEffect(() => {
     try {
       const rawProfile = window.localStorage.getItem(BUSINESS_KEY);
       const rawDraft = window.localStorage.getItem(DRAFT_KEY);
+      const rawSaved = window.localStorage.getItem(SAVED_KEY);
       const profile = rawProfile ? JSON.parse(rawProfile) : {};
-      const draft = rawDraft ? JSON.parse(rawDraft) : {};
+      const draft = rawDraft ? ensureTaxes(JSON.parse(rawDraft)) : {};
+      const saved = rawSaved ? JSON.parse(rawSaved) : [];
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setData((current) => ({ ...current, ...profile, ...draft }));
+      if (Array.isArray(saved)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSavedInvoices(saved);
+      }
     } catch {
       // Ignore corrupt/unavailable localStorage — fall back to defaults.
     } finally {
@@ -105,7 +118,16 @@ export function InvoiceGeneratorClient() {
     }
   }, [data, hydrated]);
 
-  const { subtotal, discount, tax, total } = calculateTotals(data);
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(SAVED_KEY, JSON.stringify(savedInvoices));
+    } catch {
+      // Storage may be unavailable (private browsing, quota) — safe to skip.
+    }
+  }, [savedInvoices, hydrated]);
+
+  const { subtotal, discount, taxLines, total } = calculateTotals(data);
   const theme = TEMPLATE_STYLES[data.template] ?? TEMPLATE_STYLES.classic;
 
   function updateField<K extends keyof InvoiceData>(key: K, value: InvoiceData[K]) {
@@ -129,6 +151,26 @@ export function InvoiceGeneratorClient() {
     setData((current) => ({
       ...current,
       items: current.items.filter((item) => item.id !== id),
+    }));
+  }
+
+  function updateTax(id: string, patch: Partial<InvoiceData["taxes"][number]>) {
+    setData((current) => ({
+      ...current,
+      taxes: current.taxes.map((tax) =>
+        tax.id === id ? { ...tax, ...patch } : tax,
+      ),
+    }));
+  }
+
+  function addTax() {
+    setData((current) => ({ ...current, taxes: [...current.taxes, newTaxLine("Tax", 0)] }));
+  }
+
+  function removeTax(id: string) {
+    setData((current) => ({
+      ...current,
+      taxes: current.taxes.filter((tax) => tax.id !== id),
     }));
   }
 
@@ -164,6 +206,79 @@ export function InvoiceGeneratorClient() {
     });
   }
 
+  // Clone the current invoice under a fresh number, keeping client + items.
+  function handleDuplicate() {
+    setData((current) => {
+      const number =
+        current.nextInvoiceNumber || incrementInvoiceNumber(current.invoiceNumber);
+      return {
+        ...current,
+        invoiceNumber: number,
+        nextInvoiceNumber: incrementInvoiceNumber(number),
+      };
+    });
+  }
+
+  function handleSaveCurrent() {
+    const suggested = data.clientName
+      ? `${data.invoiceNumber} — ${data.clientName}`
+      : data.invoiceNumber || "Invoice";
+    const name = window.prompt(t("saveNamePrompt"), suggested);
+    if (name === null) return; // cancelled
+    const snapshot = clone(data);
+    setSavedInvoices((current) => {
+      const existingIndex = current.findIndex(
+        (s) => s.data.invoiceNumber === data.invoiceNumber,
+      );
+      if (existingIndex !== -1) {
+        if (!window.confirm(t("overwriteSavedConfirm"))) return current;
+        const next = [...current];
+        next[existingIndex] = {
+          ...next[existingIndex],
+          name: name.trim() || suggested,
+          savedAt: Date.now(),
+          data: snapshot,
+        };
+        return next;
+      }
+      return [
+        {
+          id:
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `saved-${Date.now()}`,
+          name: name.trim() || suggested,
+          savedAt: Date.now(),
+          data: snapshot,
+        },
+        ...current,
+      ];
+    });
+  }
+
+  function handleLoadSaved(id: string) {
+    const found = savedInvoices.find((s) => s.id === id);
+    if (!found) return;
+    setData(ensureTaxes(clone(found.data)));
+  }
+
+  function handleDuplicateSaved(id: string) {
+    const found = savedInvoices.find((s) => s.id === id);
+    if (!found) return;
+    const copy = ensureTaxes(clone(found.data));
+    const number = copy.nextInvoiceNumber || incrementInvoiceNumber(copy.invoiceNumber);
+    setData({
+      ...copy,
+      invoiceNumber: number,
+      nextInvoiceNumber: incrementInvoiceNumber(number),
+    });
+  }
+
+  function handleDeleteSaved(id: string) {
+    if (!window.confirm(t("deleteSavedConfirm"))) return;
+    setSavedInvoices((current) => current.filter((s) => s.id !== id));
+  }
+
   async function handleDownloadPdf() {
     setDownloading(true);
     try {
@@ -194,18 +309,86 @@ export function InvoiceGeneratorClient() {
           </h1>
           <p className="mt-2 text-muted">{t("pageIntro")}</p>
         </div>
-        <button
-          type="button"
-          onClick={handleNewInvoice}
-          className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
-        >
-          {t("newInvoice")}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleDuplicate}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            {t("duplicate")}
+          </button>
+          <button
+            type="button"
+            onClick={handleNewInvoice}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            {t("newInvoice")}
+          </button>
+        </div>
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-2">
         {/* LEFT: editable form */}
         <div className="space-y-8">
+          <section className="rounded-xl border border-border bg-surface p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                {t("savedInvoices")}
+              </h2>
+              <button
+                type="button"
+                onClick={handleSaveCurrent}
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+              >
+                {t("saveInvoice")}
+              </button>
+            </div>
+            {savedInvoices.length === 0 ? (
+              <p className="mt-3 text-sm text-muted">{t("noSavedInvoices")}</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {savedInvoices.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">{s.name}</p>
+                      <p className="text-xs text-muted">
+                        {s.data.invoiceNumber || "—"} ·{" "}
+                        {new Date(s.savedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadSaved(s.id)}
+                        className="rounded border border-border px-2 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+                      >
+                        {t("loadSaved")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateSaved(s.id)}
+                        className="rounded border border-border px-2 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+                      >
+                        {t("duplicateSaved")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSaved(s.id)}
+                        className="rounded border border-border px-2 py-1 text-xs font-medium text-muted transition-colors hover:border-red-300 hover:text-red-600"
+                      >
+                        {t("deleteSaved")}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-muted">{t("savedInvoicesHint")}</p>
+          </section>
+
           <section className="rounded-xl border border-border bg-surface p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
               {t("businessDetails")}
@@ -441,41 +624,83 @@ export function InvoiceGeneratorClient() {
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={t("discount")}>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className="input"
-                    value={data.discountValue}
-                    onChange={(e) => updateField("discountValue", Number(e.target.value) || 0)}
-                  />
-                  <select
-                    className="input max-w-[9rem]"
-                    value={data.discountType}
-                    onChange={(e) =>
-                      updateField("discountType", e.target.value as InvoiceData["discountType"])
-                    }
-                  >
-                    <option value="percent">{t("discountPercent")}</option>
-                    <option value="fixed">{t("discountFixed")}</option>
-                  </select>
-                </div>
-              </Field>
-              <Field label={t("taxRate")}>
+            <Field label={t("discount")}>
+              <div className="flex gap-2">
                 <input
                   type="number"
                   min={0}
                   step="0.01"
                   className="input"
-                  value={data.taxRate}
-                  onChange={(e) => updateField("taxRate", Number(e.target.value) || 0)}
+                  value={data.discountValue}
+                  onChange={(e) => updateField("discountValue", Number(e.target.value) || 0)}
                 />
-              </Field>
+                <select
+                  className="input max-w-[9rem]"
+                  value={data.discountType}
+                  onChange={(e) =>
+                    updateField("discountType", e.target.value as InvoiceData["discountType"])
+                  }
+                >
+                  <option value="percent">{t("discountPercent")}</option>
+                  <option value="fixed">{t("discountFixed")}</option>
+                </select>
+              </div>
+            </Field>
+
+            <div className="mt-5">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+                {t("taxes")}
+              </h2>
+              <div className="mt-3 space-y-2">
+                {data.taxes.map((taxLine) => (
+                  <div key={taxLine.id} className="grid grid-cols-12 items-end gap-2">
+                    <div className="col-span-6">
+                      <Field label={t("taxLabel")}>
+                        <input
+                          className="input"
+                          placeholder={t("taxLabelPlaceholder")}
+                          value={taxLine.label}
+                          onChange={(e) => updateTax(taxLine.id, { label: e.target.value })}
+                        />
+                      </Field>
+                    </div>
+                    <div className="col-span-3">
+                      <Field label={t("taxRatePercent")}>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="input"
+                          value={taxLine.rate}
+                          onChange={(e) =>
+                            updateTax(taxLine.id, { rate: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </Field>
+                    </div>
+                    <div className="col-span-3">
+                      <button
+                        type="button"
+                        onClick={() => removeTax(taxLine.id)}
+                        className="h-10 w-full rounded-md border border-border text-sm font-medium text-muted transition-colors hover:border-red-300 hover:text-red-600"
+                      >
+                        {t("removeTax")}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {data.taxes.length === 0 && <p className="text-sm text-muted">—</p>}
+              </div>
+              <button
+                type="button"
+                onClick={addTax}
+                className="mt-3 rounded-md border border-dashed border-border px-4 py-2 text-sm font-medium text-accent transition-colors hover:border-accent"
+              >
+                + {t("addTax")}
+              </button>
             </div>
-            <p className="mt-2 text-xs text-muted">{t("taxDisclaimer")}</p>
+
+            <p className="mt-3 text-xs text-muted">{t("taxDisclaimer")}</p>
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-6">
@@ -602,12 +827,14 @@ export function InvoiceGeneratorClient() {
                     <span>-{formatCurrency(discount, data.currency)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-muted">
-                  <span>
-                    {t("tax")} ({data.taxRate || 0}%)
-                  </span>
-                  <span>{formatCurrency(tax, data.currency)}</span>
-                </div>
+                {taxLines.map((line) => (
+                  <div key={line.id} className="flex justify-between text-muted">
+                    <span>
+                      {(line.label || t("tax"))} ({line.rate || 0}%)
+                    </span>
+                    <span>{formatCurrency(line.amount, data.currency)}</span>
+                  </div>
+                ))}
                 <div
                   className={`flex justify-between text-base font-bold ${theme.totalRowClass} ${theme.totalWrapperClass || "pt-2"}`}
                 >
